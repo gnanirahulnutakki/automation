@@ -1,0 +1,284 @@
+/Users/nutakki/Documents/CLOUD/k8s-stuff/logcollector/logcollector-shell-job/verify-logs.sh
+Starting Verification Tests...
+
+=== Testing Pod Access and Environment ===
+✓ Successfully found FID pods in namespace duploservices-rli-ops05-raht
+
+Pod Details:
+  - fid-0
+NAME    READY   STATUS    RESTARTS   AGE   IP             NODE                                         NOMINATED NODE   READINESS GATES
+fid-0   2/2     Running   0          86m   10.213.16.14   ip-10-213-17-85.us-west-2.compute.internal   <none>           <none>
+
+Using pod 'fid-0' for testing...
+
+Testing log directory access:
+✓ Can access /opt/radiantone/vds/vds_server/logs
+  Sample files:
+total 146992
+drwxrwsrwx  6 root 1000     4096 Nov  5 16:55 .
+drwxrwsrwx 15 root 1000     4096 Sep 25 20:41 ..
+-rw-rw-r--  1 root 1000        0 Sep 25 20:42 adap_access.log
+-rw-rw-r--  1 root 1000       86 Nov  5 16:55 adap_access.log.pos
+✓ Can access /opt/radiantone/vds/vds_server/logs/jetty
+  Sample files:
+total 472
+drwxrwsrwx 2 root 1000   4096 Sep 25 20:42 .
+drwxrwsrwx 6 root 1000   4096 Nov  5 16:55 ..
+-rw-rw-r-- 1 root 1000 465083 Nov  5 16:56 web.log
+-rw-rw-r-- 1 root 1000     85 Nov  5 16:56 web.log.pos
+✓ Can access /opt/radiantone/vds/vds_server/logs/sync_engine
+  Sample files:
+total 16
+drwxrwsr-x 2 root 1000 4096 Sep 25 20:42 .
+drwxrwsrwx 6 root 1000 4096 Nov  5 16:55 ..
+-rw-rw-r-- 1 root 1000  628 Nov  5 16:55 sync_engine.log
+-rw-rw-r-- 1 root 1000   98 Nov  5 16:55 sync_engine.log.pos
+✓ Can access /opt/radiantone/vds/logs
+  Sample files:
+total 28
+drwxrwsrwx  5 root 1000 4096 Sep 25 20:42 .
+drwxrwsrwx 21 root 1000 4096 Sep 27 07:40 ..
+-rw-rw-r--  1 root 1000 2662 Oct  5 01:01 alerts.log
+-rw-rw-r--  1 root 1000   70 Nov  5 16:55 alerts.log.pos
+
+=== Testing Full Log Analysis ===
+
+Analyzing files in /opt/radiantone/vds/vds_server/logs:
+
+File: vds_server.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: admin_rest_api_access.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: vds_server.log.pos
+  ℹ No date found - will use current date
+
+File: custom_package.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: gc2024-09-27_07-40-53.log.0.current
+  ✓ Found date: 2024-09-27
+
+File: sync_engine.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: sync_engine.log.pos
+  ℹ No date found - will use current date
+
+File: audit.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: adap_access.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: web.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: web_access.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: web.log.pos
+  ℹ No date found - will use current date
+
+File: web_access.log.pos
+  ℹ No date found - will use current date
+
+File: vds_events.log.pos
+  ℹ No date found - will use current date
+
+File: vds_server_access.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: scim.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: vds_events.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: stats.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: gc2024-09-25_20-42-01.log.0.current
+  ✓ Found date: 2024-09-25
+
+File: admin_rest_api_access.log.pos
+  ℹ No date found - will use current date
+
+File: task.default_internal_processing_queue_threshold.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_zk_cluster_write.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_connections.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_memory.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_processing_queue_threshold.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_vds_running.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_disk_latency.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: server.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.JStackMonitorTask.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: task.default_disk_usage.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: adap_access.log.pos
+  ℹ No date found - will use current date
+
+File: periodiccache.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: vrs_server.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: vrs_access.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: gc2024-11-05_16-55-18.log.0.current
+  ✓ Found date: 2024-11-05
+
+File: gc2024-09-30_23-11-48.log.0.current
+  ✓ Found date: 2024-09-30
+
+File: periodiccache.log.pos
+  ℹ No date found - will use current date
+
+Summary for /opt/radiantone/vds/vds_server/logs:
+  Total files: 37
+  Files with dates: 4
+  Active files: 25
+
+Unique dates found:
+2024-09-25
+2024-09-27
+2024-09-30
+2024-11-05
+
+Analyzing files in /opt/radiantone/vds/vds_server/logs/jetty:
+
+File: web.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: web_access.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: web.log.pos
+  ℹ No date found - will use current date
+
+File: web_access.log.pos
+  ℹ No date found - will use current date
+
+Summary for /opt/radiantone/vds/vds_server/logs/jetty:
+  Total files: 4
+  Files with dates: 0
+  Active files: 2
+
+Analyzing files in /opt/radiantone/vds/vds_server/logs/sync_engine:
+
+File: sync_engine.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: sync_engine.log.pos
+  ℹ No date found - will use current date
+
+Summary for /opt/radiantone/vds/vds_server/logs/sync_engine:
+  Total files: 2
+  Files with dates: 0
+  Active files: 1
+
+Analyzing files in /opt/radiantone/vds/logs:
+
+File: alerts.log.pos
+  ℹ No date found - will use current date
+
+File: cluster_command.2024-09-30_23-12-21.log
+  ✓ Found date: 2024-09-30
+  ℹ Active log file - will be processed last
+
+File: cluster_command.2024-09-25_20-42-34.log
+  ✓ Found date: 2024-09-25
+  ℹ Active log file - will be processed last
+
+File: cluster_command.2024-11-05_16-55-44.log
+  ✓ Found date: 2024-11-05
+  ℹ Active log file - will be processed last
+
+File: cluster_command.2024-09-27_07-41-25.log
+  ✓ Found date: 2024-09-27
+  ℹ Active log file - will be processed last
+
+File: instanceManager.2024-09-25_20-41-43.log
+  ✓ Found date: 2024-09-25
+  ℹ Active log file - will be processed last
+
+File: instanceManager.2024-09-25_20-41-44.log
+  ✓ Found date: 2024-09-25
+  ℹ Active log file - will be processed last
+
+File: approvals_audit.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: contextbuilder_audit.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: alerts.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+File: filemanager_audit.log
+  ℹ No date found - will use current date
+  ℹ Active log file - will be processed last
+
+Summary for /opt/radiantone/vds/logs:
+  Total files: 11
+  Files with dates: 6
+  Active files: 10
+
+Unique dates found:
+2024-09-25
+2024-09-27
+2024-09-30
+2024-11-05

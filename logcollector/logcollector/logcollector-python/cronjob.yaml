@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: log-archiver
+spec:
+  schedule: "0 0 * * *"  # Run at midnight every day
+  concurrencyPolicy: Replace
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: log-archiver-sa  # Service account with necessary permissions
+          containers:
+          - name: log-archiver
+            image: log-archiver:latest  # Your built image
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: S3_BUCKET
+              value: "your-bucket-name"
+            - name: S3_PREFIX
+              value: "logs/fid"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: secret-key
+            volumeMounts:
+            - name: logs-volume
+              mountPath: /opt/radiantone
+            - name: state-volume
+              mountPath: /var/run
+          volumes:
+          - name: logs-volume
+            hostPath:
+              path: /opt/radiantone
+          - name: state-volume
+            emptyDir: {}
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-archiver-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: log-archiver-role
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: log-archiver-rolebinding
+subjects:
+- kind: ServiceAccount
+  name: log-archiver-sa
+roleRef:
+  kind: Role
+  name: log-archiver-role
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,206 @@
+{{- if .Values.metrics.fluentbit.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.metrics.fluentbit.configMap.name | default "fluent-bit-config" }}
+data:
+  fluent-bit.conf: |
+    # Service Configuration
+    [SERVICE]
+        Flush              1
+        Daemon             Off
+        Log_Level          info
+        Parsers_File       parsers.conf
+        HTTP_Server        Off
+        storage.metrics    On
+        storage.path       /var/log/fluent-bit-buffers/
+        storage.sync       normal
+        storage.checksum   on
+        storage.backlog.mem_limit 256M
+
+    # Input Sections
+    {{- $clusterName := .Values.zk.clusterName | default "fid-cluster" }}
+    {{- range $logName, $logConfig := .Values.metrics.fluentbit.logs }}
+      {{- if $logConfig.enabled }}
+    [INPUT]
+        Name                tail
+        Path                {{ $logConfig.path }}
+        Tag                 {{ $logName }}
+        Refresh_Interval    5
+        Rotate_Wait         30
+        DB                  /fluent-bit/tail_db/{{ $logName }}.db
+        Skip_Long_Lines     Off
+        Multiline           Off
+        storage.type        filesystem
+        {{- if $logConfig.parse }}
+        Parser              {{ $logName }}_parser
+        {{- end }}
+        # No parser specified for logs without parse config
+      {{- end }}
+    {{- end }}
+
+    # Filters
+    [FILTER]
+        Name                record_modifier
+        Match               *
+        Record              hostname ${HOSTNAME}
+        Record              clustername {{ $clusterName }}
+
+    # Collect index names per log, including '.log' suffix
+    {{- $indexes := dict }}
+    {{- range $logName, $logConfig := .Values.metrics.fluentbit.logs }}
+      {{- if $logConfig.enabled }}
+        {{- $indexName := $logConfig.custom_index | default $logConfig.index | default $logName }}
+        {{- set $indexes $logName $indexName }}
+      {{- end }}
+    {{- end }}
+
+    # Output Sections
+    {{- range $aggregator := .Values.metrics.fluentbit.aggregators }}
+      {{- range $logName, $indexName := $indexes }}
+    [OUTPUT]
+        Name                {{ $aggregator.type }}
+        Match               {{ $logName }}
+        {{- if eq $aggregator.type "es" }}
+        # Elasticsearch Output
+        Host                {{ $aggregator.host }}
+        Port                {{ $aggregator.port }}
+        {{- if $aggregator.user }}
+        HTTP_User           {{ $aggregator.user }}
+        {{- end }}
+        {{- if $aggregator.password }}
+        HTTP_Passwd         {{ $aggregator.password }}
+        {{- end }}
+        Logstash_Format     On
+        Logstash_Prefix     {{ $indexName }}
+        Replace_Dots        On
+        Include_Tag_Key     On
+        Tag_Key             @log_name
+        Retry_Limit         False
+        {{- if $aggregator.tls }}
+        tls                 On
+          {{- if $aggregator.tls_verify }}
+          tls.verify        {{ $aggregator.tls_verify }}
+          {{- else }}
+          tls.verify        On
+          {{- end }}
+        {{- else }}
+        tls                 Off
+        {{- end }}
+        {{- else if eq $aggregator.type "opensearch" }}
+        # OpenSearch Output
+        Host                {{ $aggregator.host }}
+        Port                {{ $aggregator.port }}
+        {{- if $aggregator.user }}
+        HTTP_User           {{ $aggregator.user }}
+        {{- end }}
+        {{- if $aggregator.password }}
+        HTTP_Passwd         {{ $aggregator.password }}
+        {{- end }}
+        Logstash_Format     On
+        Logstash_Prefix     {{ $indexName }}
+        Replace_Dots        On
+        Include_Tag_Key     On
+        Tag_Key             @log_name
+        Retry_Limit         False
+        {{- if $aggregator.tls }}
+        tls                 On
+          {{- if $aggregator.tls_verify }}
+          tls.verify        {{ $aggregator.tls_verify }}
+          {{- else }}
+          tls.verify        On
+          {{- end }}
+        {{- else }}
+        tls                 Off
+        {{- end }}
+        {{- else if eq $aggregator.type "splunk" }}
+        # Splunk Output
+        Host                {{ $aggregator.host }}
+        Port                {{ $aggregator.port }}
+        Splunk_Token        {{ $aggregator.splunk_token }}
+        Splunk_Send_Raw     On
+        Splunk_Index        {{ regexReplaceAll "\.log$" "" $indexName }}
+        {{- if $aggregator.tls }}
+        tls                 On
+          {{- if $aggregator.tls_verify }}
+          tls.verify        {{ $aggregator.tls_verify }}
+          {{- else }}
+          tls.verify        Off
+          {{- end }}
+        {{- else }}
+        tls                 Off
+        {{- end }}
+        {{- else if eq $aggregator.type "s3" }}
+        # S3 Output
+        Bucket              {{ $aggregator.bucket }}
+        Region              {{ $aggregator.region }}
+        total_file_size     {{ $aggregator.total_file_size | default "50M" }}
+        upload_timeout      {{ $aggregator.upload_timeout | default "10m" }}
+        store_dir           /fluent-bit/storage
+        s3_key_format       /logs/{{ $indexName }}/%Y/%m/%d/%H/%M/%S
+        {{- else if eq $aggregator.type "azure" }}
+        # Azure Blob Output
+        Name                azure_blob
+        Account_Name        {{ $aggregator.account_name }}
+        Shared_Key          {{ $aggregator.shared_key }}
+        Container_Name      {{ $aggregator.container_name }}
+        {{- if $aggregator.tls }}
+        tls                 On
+          {{- if $aggregator.tls_verify }}
+          tls.verify        {{ $aggregator.tls_verify }}
+          {{- else }}
+          tls.verify        Off
+          {{- end }}
+        {{- else }}
+        tls                 Off
+        {{- end }}
+        {{- else if eq $aggregator.type "datadog" }}
+        # Datadog Output
+        API_Key             {{ $aggregator.api_key }}
+        Host                {{ $aggregator.host | default "http-intake.logs.datadoghq.com" }}
+        tls                 On
+        {{- else if eq $aggregator.type "sumologic" }}
+        # Sumologic Output
+        Name                http
+        Host                {{ $aggregator.host }}
+        URI                 {{ $aggregator.uri }}
+        Format              {{ $aggregator.format | default "json" }}
+        {{- if $aggregator.tls }}
+        tls                 On
+          {{- if $aggregator.tls_verify }}
+          tls.verify        {{ $aggregator.tls_verify }}
+          {{- else }}
+          tls.verify        On
+          {{- end }}
+        {{- else }}
+        tls                 Off
+        {{- end }}
+        {{- else if eq $aggregator.type "loki" }}
+        # Loki Output
+        Url                 {{ $aggregator.url }}
+        labels              {{ $aggregator.labels | default "{job=\"fluent-bit\"}" }}
+        {{- else if eq $aggregator.type "stdout" }}
+        # Stdout Output
+        Format              json_lines
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  parsers.conf: |
+    # Parser Definitions
+    {{- range $logName, $logConfig := .Values.metrics.fluentbit.logs }}
+      {{- if $logConfig.parse }}
+    [PARSER]
+        Name                {{ $logName }}_parser
+        Format              {{ $logConfig.parse.format | default "regex" }}
+        {{- if eq $logConfig.parse.format "regex" }}
+        Regex               {{ $logConfig.parse.regex }}
+        {{- else if eq $logConfig.parse.format "csv" }}
+        Separator           {{ $logConfig.parse.separator | default "," }}
+        Keys                {{ $logConfig.parse.keys }}
+        {{- end }}
+        Time_Key            {{ $logConfig.parse.time_key | default "time" }}
+        Time_Format         {{ $logConfig.parse.time_format | default "%Y-%m-%d %H:%M:%S" }}
+        Types               {{ $logConfig.parse.types }}
+      {{- end }}
+    {{- end }}
+{{- end }}

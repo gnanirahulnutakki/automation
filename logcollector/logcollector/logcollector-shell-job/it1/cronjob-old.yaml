@@ -1,0 +1,99 @@
+# Add this to your cronjob.yaml at the top
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-config
+  namespace: duploservices-rli-ops05-raht
+data:
+  aws-region: "us-west-2"  # Replace with your AWS region
+  s3-bucket: "your-actual-bucket-name"  # Replace with your actual S3 bucket name
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logs-sync-state
+  namespace: duploservices-rli-ops05-raht
+data:
+  state.json: |
+    {"first_run": true, "last_run": null, "processed_files": []}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: logs-to-s3-sync
+  namespace: duploservices-rli-ops05-raht
+spec:
+  schedule: "0 0 * * *"  # Run at midnight UTC
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: logs-sync-sa  # You'll need to create this
+          containers:
+          - name: logs-sync
+            image: amazon/aws-cli:2.13.0
+            command:
+            - /bin/bash
+            - -c
+            - |
+              apt-get update && apt-get install -y curl jq
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
+              cat > sync-logs-to-s3.sh << 'EOF'
+              $(cat sync-logs-to-s3.sh)  # This will be replaced with your script content
+              EOF
+              chmod +x sync-logs-to-s3.sh
+              ./sync-logs-to-s3.sh
+            env:
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: aws-config
+                  key: aws-region
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: aws-config
+                  key: s3-bucket
+          restartPolicy: OnFailure
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: logs-sync-sa
+  namespace: duploservices-rli-ops05-raht
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: logs-sync-role
+  namespace: duploservices-rli-ops05-raht
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: logs-sync-rolebinding
+  namespace: duploservices-rli-ops05-raht
+subjects:
+- kind: ServiceAccount
+  name: logs-sync-sa
+  namespace: duploservices-rli-ops05-raht
+roleRef:
+  kind: Role
+  name: logs-sync-role
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,77 @@
+I want to create a kubernetes cron job, that would run on specified intervals and do the following
+
+I have a statefulset application that is deployed through helm
+
+This application has its logs written to multiples files, in the file system
+
+Currently we use fluentd to aggregate these logs and push to multiple endpoints for analysis and viewing
+
+These logs are zipped when they are rolled over and a timestamp is attached to them
+
+# -------------------------------
+What I want to do?
+# -------------------------------
+
+I want to create a cron job that runs in the midnight at 12 AM every day and pushes these logs from multiple folders into s3
+
+This is the process I want the script(JOB) to follow
+
+Make sure the logs exist
+
+Make sure the paths to logs exist
+
+IF logs or paths do not exist, check for them on every push at scheduled interval and ignore if they dont exist
+
+If the logs exist, and since some of them have timestamps attached to them, create a folder with that day time stamp , for example on 2024-10-30 at 12 AM since the date changes to 2024-10-31, create a folder named 2024-10-30 basically the previous days date
+
+Then inside this folder, create the folder based on the replica count, for example if fid (application name) has replicas set to "3" that means there will be three pods fid-0, fid-1, fid-2 and script has to individually run on these three pods and collect the logs and push them to s3
+
+Lets say if I start the cron job today, and this is triggered today at 12 AM, since this is the first run, the script should create multiple folders with dates there can be any number, so there will mutiple folders with again sub folders named after the pods and their corresponding zipped logs or unzipped logs with the timestamp
+
+There will be some logs without any time stamp attached, those can directly be put in the latest dated folder in s3 (on the first run) and then in the corresponding date and the pod from which they are taken
+
+# -------------------------------
+The problems that we might face
+# -------------------------------
+On the first run, the files without timestamps should be put in the folder that is created based on the date that script is running (the previous days date)
+
+On the next consecutive runs the logs without time stamps, if they are already put in some folder, should be ignored and only the files that were created after the previous push to s3 was done, are to be collected and pushed to s3, so basically there needs to be a mechanism that would understand this change and the current file without timestamp details.
+
+This has to be seamless and not cause any overhead on the pods memory or cpu wise
+
+THe copy from pods (based on replica count or any other means) can be done paralelly, so that logs are being copied to s3 from all the pods at the same time
+
+FIle modification during copy, if there are any file modifications during the copy process or the job is running, this should be handled gracefully
+
+# -------------------------------
+Additional Considerations
+# -------------------------------
+
+
+There can additional paths that can be added to the script, or some paths or files that will not yet be created during the first couple runs, but when these are created, the job should be able to recognize and also include them to copy over to s3
+
+These are the log file locations
+1.  vds_server.log , vds_server_access.log, periodiccache.log, vds_events.log,  from the location "/opt/radiantone/vds/vds_server/logs"
+2. web.log and web_access.log from "/opt/radiantone/vds/vds_server/logs/jetty"
+3. sync_engine.log from the location "/opt/radiantone/vds/vds_server/logs/sync_engine"
+4.  alerts.log  from the location "/opt/radiantone/vds/logs"
+
+# -------------------------------
+The logs usually looks like this from the location
+# -------------------------------
+
+bash-4.2# cd /opt/radiantone/vds/vds_server/logs
+bash-4.2# ls
+adap_access.log                      gc2023-03-01_18-01-16.log.0.current  gc2023-06-29_18-24-10.log.0.current  gc2023-10-31_13-22-24.log.0.current  gc2024-03-11_13-34-45.log.0          gc2024-07-24_15-03-24.log.0.current  periodiccache-2.log    stats.log                               vds_server-2024-07-13_12-03-18.log.zip  vds_server.log.pos                             vds_server_access.csv.10   vrs
+adap_access.log.pos                  gc2023-03-02_14-54-00.log.0.current  gc2023-07-13_16-21-16.log.0.current  gc2023-11-01_13-11-24.log.0.current  gc2024-03-11_13-34-45.log.1.current  gc2024-08-20_19-25-59.log.0.current  periodiccache-3.log    sync_engine                             vds_server-2024-07-27_08-07-09.log.zip  vds_server_access-2024-09-26_17-53-53.log.zip  vds_server_access.csv.11   web.log.pos
+admin_rest_api_access.log            gc2023-03-07_20-54-57.log.0.current  gc2023-07-14_02-43-30.log.0.current  gc2023-11-03_15-14-33.log.0.current  gc2024-04-22_18-51-34.log.0.current  gc2024-08-27_13-05-24.log.0.current  periodiccache-4.log    sync_engine.log.pos                     vds_server-2024-08-01_07-20-06.log.zip  vds_server_access-2024-09-27_19-24-54.log.zip  vds_server_access.csv.12   web_access.log.pos
+admin_rest_api_access.log.pos        gc2023-03-17_20-58-43.log.0.current  gc2023-07-23_17-02-41.log.0.current  gc2023-11-07_14-37-38.log.0.current  gc2024-04-23_06-30-47.log.0.current  gc2024-09-03_13-34-04.log.0.current  periodiccache-5.log    vds_events.log                          vds_server-2024-08-07_09-13-06.log.zip  vds_server_access-2024-10-01_10-22-15.log.zip  vds_server_access.csv.2
+alerts.log.pos                       gc2023-04-06_07-00-41.log.0.current  gc2023-08-01_13-55-32.log.0.current  gc2023-11-16_15-26-57.log.0.current  gc2024-04-23_06-31-41.log.0.current  gc2024-09-09_13-38-13.log.0.current  periodiccache-6.log    vds_events.log.pos                      vds_server-2024-08-30_15-11-06.log.zip  vds_server_access-2024-10-02_13-15-04.log.zip  vds_server_access.csv.3
+audit.log                            gc2023-04-06_21-53-58.log.0.current  gc2023-08-23_09-58-07.log.0.current  gc2023-12-01_06-16-43.log.0.current  gc2024-04-26_14-57-27.log.0.current  gc2024-09-16_14-07-41.log.0.current  periodiccache-7.log    vds_server-2023-03-21_04-42-00.log.zip  vds_server-2024-09-06_13-03-18.log.zip  vds_server_access-2024-10-03_14-39-49.log.zip  vds_server_access.csv.4
+correlation                          gc2023-04-10_14-08-00.log.0.current  gc2023-08-25_04-34-10.log.0.current  gc2023-12-13_16-20-28.log.0.current  gc2024-05-06_14-36-39.log.0.current  gc2024-09-25_18-31-54.log.0.current  periodiccache-8.log    vds_server-2023-03-26_13-32-00.log.zip  vds_server-2024-09-12_09-08-59.log.zip  vds_server_access-2024-10-04_18-04-53.log.zip  vds_server_access.csv.5
+custom_package.log                   gc2023-04-10_19-28-17.log.0.current  gc2023-08-25_13-27-45.log.0.current  gc2024-01-12_15-16-03.log.0.current  gc2024-05-18_12-30-18.log.0.current  gc2024-09-30_13-46-54.log.0.current  periodiccache-9.log    vds_server-2023-04-03_04-11-59.log.zip  vds_server-2024-09-19_13-28-59.log.zip  vds_server_access-2024-10-09_14-16-59.log.zip  vds_server_access.csv.6
+fid_dump.log                         gc2023-04-10_21-11-03.log.0.current  gc2023-08-30_09-22-44.log.0          gc2024-01-16_14-51-22.log.0.current  gc2024-05-20_14-32-06.log.0.current  gc2024-10-08_17-54-57.log.0.current  periodiccache.log      vds_server-2023-04-09_16-58-59.log.zip  vds_server-2024-09-30_14-28-18.log.zip  vds_server_access-2024-10-10_18-03-00.log.zip  vds_server_access.csv.7
+gc2023-02-24_21-56-05.log.0.current  gc2023-04-17_13-56-17.log.0.current  gc2023-08-30_09-22-44.log.1.current  gc2024-01-17_20-52-44.log.0.current  gc2024-06-17_01-40-05.log.0.current  gc2024-10-24_13-15-03.log.0.current  periodiccache.log.pos  vds_server-2024-01-26_08-00-18.log.zip  vds_server-2024-10-04_02-25-06.log.zip  vds_server_access-2024-10-11_21-54-59.log.zip  vds_server_access.csv.8
+gc2023-02-28_17-35-18.log.0.current  gc2023-04-20_16-43-09.log.0.current  gc2023-10-09_16-13-41.log.0.current  gc2024-02-06_14-18-35.log.0.current  gc2024-07-02_17-55-54.log.0.current  jetty                                rli_pub.key            vds_server-2024-05-16_06-06-59.log.zip  vds_server-2024-10-10_09-08-18.log.zip  vds_server_access-2024-10-25_14-13-29.log.zip  vds_server_access.csv.9
+gc2023-02-28_20-49-57.log.0.current  gc2023-06-04_03-13-54.log.0.current  gc2023-10-28_07-24-09.log.0.current  gc2024-02-27_14-27-22.log.0.current  gc2024-07-12_12-49-23.log.0.current  periodiccache-1.log                  scheduler              vds_server-2024-05-24_08-16-06.log.zip  vds_server-2024-10-25_14-25-03.log.zip  vds_server_access.csv                          vds_server_access.csv.pos
+gc2023-03-01_16-45-27.log.0.current  gc2023-06-15_19-46-38.

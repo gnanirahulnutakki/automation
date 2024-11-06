@@ -1,0 +1,128 @@
+# AWS Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aws-config
+  namespace: duploservices-rli-ops05-raht
+data:
+  aws-region: "us-west-2"  # Replace with your AWS region
+  # s3-bucket: "duploservices-rli-ops05-raht -r1-backups-125328463501"
+  s3-bucket: "duploservices-rli-ops05-raht-r1-backups-125328463501"
+---
+# State Management ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logs-sync-state
+  namespace: duploservices-rli-ops05-raht
+data:
+  state.json: |
+    {"first_run": true, "last_run": null, "processed_files": []}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: logs-to-s3-sync
+  namespace: duploservices-rli-ops05-raht
+spec:
+  schedule: "0 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: logs-sync-sa
+          nodeSelector:
+            tenantname: duploservices-rli-ops05-raht
+          containers:
+          - name: logs-sync
+            image: rahulnutakki/saas-log-collector:0.0.2
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Copy script to writable location and make executable
+              cp /scripts/sync-logs-to-s3.sh /workspace/
+              chmod +x /workspace/sync-logs-to-s3.sh
+
+              # Run script
+              echo "Starting sync script execution at $(date -u)"
+              /workspace/sync-logs-to-s3.sh
+            env:
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: aws-config
+                  key: aws-region
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: aws-config
+                  key: s3-bucket
+            resources:
+              requests:
+                cpu: "200m"
+                memory: "512Mi"
+              limits:
+                cpu: "500m"
+                memory: "1Gi"
+            volumeMounts:
+            - name: temp-storage
+              mountPath: /tmp/logs_to_sync
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: workspace
+              mountPath: /workspace
+          volumes:
+          - name: temp-storage
+            emptyDir: {}
+          - name: scripts
+            configMap:
+              name: sync-logs-script
+              defaultMode: 0755
+          - name: workspace
+            emptyDir: {}
+          restartPolicy: OnFailure
+          terminationGracePeriodSeconds: 300
+---
+# ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: logs-sync-sa
+  namespace: duploservices-rli-ops05-raht
+---
+# Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: logs-sync-role
+  namespace: duploservices-rli-ops05-raht
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/exec", "pods/cp"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "create", "update", "patch"]
+---
+# RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: logs-sync-rolebinding
+  namespace: duploservices-rli-ops05-raht
+subjects:
+- kind: ServiceAccount
+  name: logs-sync-sa
+  namespace: duploservices-rli-ops05-raht
+roleRef:
+  kind: Role
+  name: logs-sync-role
+  apiGroup: rbac.authorization.k8s.io
